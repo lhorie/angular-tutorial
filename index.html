@@ -1,0 +1,202 @@
+<!doctype html>
+<html>
+	<head>
+		<title></title>
+		<link href='http://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap.min.css' rel='stylesheet' />
+		<link href='http://cdnjs.cloudflare.com/ajax/libs/codemirror/3.12.0/codemirror.css' rel='stylesheet' />
+		<style>.CodeMirror {height:600px;}</style>
+	</head>
+	<body>
+		<div id='tutorial'>
+			<div class='container-fluid page-header'>
+				<div class='form-inline row-fluid' ng-controller='TutorialCtrl'>
+					<div class='span6'>
+						<form name='form'>
+							<div class='control-group'>
+								<input class='input-medium' ng-model='name' placeholder='Tutorial Name' required type='text' />
+								<button class='btn' ng-click='createTutorial(name)' ng-disabled='form.$invalid' type='button'>Create tutorial</button>
+							</div>
+						</form>
+						
+						<table class='table table-condensed'>
+							<tr>
+								<th>Tutorial Name</th>
+								<th>Created</th>
+								<th>Length</th>
+							</tr>
+							<tr ng-repeat='tutorial in tutorials' ng-class='{success: tutorial == tutorials[currentTutorial]}'>
+								<td><a ng-click='setCurrentTutorial($index)' href=''>{{tutorial.name}}</a></td>
+								<td>{{tutorial.date | date: 'MMM d, yyyy'}}</td>
+								<td>{{tutorial.steps.length}} steps</td>
+							</tr>
+						</table>
+						
+						<code-player tutorial='tutorials[currentTutorial]'></code-player>
+					</div>
+					<div class='span6'>
+						<code-runner tutorial='tutorials[currentTutorial]'></code-runner>
+					</div>
+				</div>
+			</div>
+			
+			<script type='text/ng-template' id='codeplayer.html'>
+				<form ng-show='tutorial'>
+					<div class='control-group'>
+						<textarea ui-codemirror='{lineNumbers: true, lineWrapping: true, tabSize: 2, mode: "text/html"}' ng-model='tutorial.steps[tutorial.currentStep]' ui-refresh='true'></textarea>
+					</div>
+					
+					<div class='control-group'>
+						Step {{tutorial.currentStep + 1}} of {{tutorial.steps.length}}
+						
+						<button class='btn' ng-click='tutorial.prevStep()' type='button'>&lt;</button>
+						<button class='btn' ng-click='tutorial.nextStep()' type='button'>&gt;</button>
+						
+						<button class='btn' ng-click='tutorial.addStep()' ng-show='tutorial.currentStep == tutorial.steps.length - 1' type='button'>Add step</button>
+					</div>
+				</form>
+			</script>
+			
+			<script type='text/ng-template' id='coderunner.html'>
+				<iframe frameborder='0' style='height:800px;width:100%;'></iframe>
+			</script>
+		</div>
+	
+		<script src='http://cdnjs.cloudflare.com/ajax/libs/angular.js/1.1.5/angular.min.js'></script>
+		<script src='http://cdnjs.cloudflare.com/ajax/libs/angular-ui/0.4.0/angular-ui.min.js'></script>
+		<script src='http://cdnjs.cloudflare.com/ajax/libs/codemirror/3.12.0/codemirror.min.js'></script>
+        <script src='http://cdnjs.cloudflare.com/ajax/libs/codemirror/2.36.0/xml.min.js'></script>
+        <script src='http://cdnjs.cloudflare.com/ajax/libs/codemirror/2.36.0/javascript.min.js'></script>
+        <script src='http://cdnjs.cloudflare.com/ajax/libs/codemirror/2.36.0/css.min.js'></script>
+        <script src='http://cdnjs.cloudflare.com/ajax/libs/codemirror/2.36.0/htmlmixed.min.js'></script>
+		<script>
+angular.module('tutorial', ['ui.directives'])
+
+angular.module('tutorial').factory('Tutorial', function() {
+	function Tutorial(args) {
+		this.name = args.name
+		this.date = args.date || new Date
+		this.steps = args.steps || ['']
+		this.currentStep = 0
+	}
+	
+	Tutorial.prototype.prevStep = function() {
+		this.currentStep = Math.max(this.currentStep - 1, 0)
+	}
+	Tutorial.prototype.nextStep = function() {
+		this.currentStep = Math.min(this.currentStep + 1, this.steps.length - 1)
+	}
+	
+	Tutorial.prototype.addStep = function() {
+		var step = this.steps[this.currentStep]
+		this.steps.splice(this.currentStep, 0, step)
+		this.nextStep()
+	}
+	
+	return Tutorial
+})
+
+angular.module('tutorial').controller('TutorialCtrl', function($scope, $http, Tutorial) {
+	$scope.tutorials = [new Tutorial({name: 'test', steps: ['hello world']})]
+	
+	$http.get('presentation.json?'+Math.random()).success(function(data) {
+		var tutorial = new Tutorial({name: 'Angular Tutorial', steps: data})
+		$scope.tutorials.push(tutorial)
+	})
+	
+	$scope.currentTutorial = 0
+	
+	$scope.createTutorial = function(name) {
+		$scope.tutorials.push(new Tutorial({name: name}))
+		$scope.name = ''
+		$scope.setCurrentTutorial($scope.tutorials.length - 1)
+	}
+	
+	$scope.setCurrentTutorial = function(index) {
+		$scope.currentTutorial = index
+	}
+})
+
+angular.module('tutorial').directive('codePlayer', function() {
+	return {
+		restrict: 'E',
+		templateUrl: 'codeplayer.html',
+		scope: {
+			tutorial: '='
+		}
+	}
+})
+
+angular.module('tutorial').directive('codeRunner', function() {
+	return {
+		restrict: 'E',
+		templateUrl: 'coderunner.html',
+		replace: true,
+		scope: {
+			tutorial: '='
+		},
+		link: function($scope, element, attrs) {
+			$scope.$watch('tutorial', function(tutorial) {
+				if (tutorial) {
+					var doc = element[0].contentWindow.document
+					doc.open()
+					doc.write(tutorial.steps[tutorial.currentStep])
+					doc.close()
+				}
+			}, true)
+		}
+	}
+})
+
+window.onload = function() {
+	angular.bootstrap(document.getElementById('tutorial'), ['tutorial'])
+}
+
+
+
+
+		</script>
+		
+		<script src='http://cdnjs.cloudflare.com/ajax/libs/jasmine/1.3.1/jasmine.js'></script>
+		<script src='http://cdnjs.cloudflare.com/ajax/libs/angular.js/1.1.1/angular-mocks.js'></script>
+		<script src='https://raw.github.com/larrymyers/jasmine-reporters/master/src/jasmine.console_reporter.js'></script>
+		<script>
+describe('tutorial app', function() {
+	beforeEach(module('tutorial'))
+
+	describe('tutorial class', function() {
+		it('should step back and forth', inject(function(Tutorial) {
+			var tutorial = new Tutorial({name: 'test', steps: ['a', 'b']})
+			
+			tutorial.nextStep()
+			expect(tutorial.currentStep).toEqual(1)
+			tutorial.nextStep()
+			expect(tutorial.currentStep).toEqual(1)
+			
+			tutorial.prevStep()
+			expect(tutorial.currentStep).toEqual(0)
+			tutorial.prevStep()
+			expect(tutorial.currentStep).toEqual(0)
+		}))
+		
+		it('should add steps', inject(function(Tutorial) {
+			var tutorial = new Tutorial({name: 'test', steps: ['hello', 'world']})
+			
+			tutorial.addStep()
+			expect(tutorial.currentStep).toBe(1)
+			expect(tutorial.steps[1]).toEqual('hello')
+			
+			tutorial.steps[1] = 'nice'
+			tutorial.addStep()
+			expect(tutorial.currentStep).toBe(2)
+			expect(tutorial.steps).toEqual(['hello', 'nice', 'nice', 'world'])
+		}))
+	})
+})
+
+var env = jasmine.getEnv()
+env.addReporter(new jasmine.ConsoleReporter())
+env.execute()
+
+		</script>
+	</body>
+</html>
